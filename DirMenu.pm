@@ -5,7 +5,7 @@ use strict;
 use Cwd;
 use warnings;
 
-our $VERSION = 0.6;		# 07/05/2001
+our $VERSION = 0.61;		# 10/05/2001
 
 =head1 NAME
 
@@ -21,18 +21,16 @@ Print a simple menu of HTML files in current working directory:
 
 	use HTML::EasyTemplate;
 	my $m = new HTML::EasyTemplate::DirMenu (
-		'START'			=> 'E:/www/leegoddard_com/FL',
-		'URL_ROOT'		=> 'http://localhost/leegoddard_com/FL',
-		'EXTENSIONS'	=> '.*',
-		'MODE'			=>	'all',
-		'RECURSE'		=> 'true',
-		'TITLE_IN'		=> 'true',
-		'LIST_START'	=> '<UL>',
-		'LIST_END'		=> '</UL>',
-		'ARTICLE_START'	=> '<LI>',
-		'ARTICLE_END'	=> '</LI>',
-		'DIR_START'		=> '<BR><BIG>',
-		'DIR_END'		=> '</BIG>',
+		'START'			=> 'E:/www/leegoddard_com',
+		'URL_ROOT'		=> 'http://leegoddard_com',
+		'MODE'			=> 'files',
+		'TITLE_FROM'	=> 'title',
+		'LIST_START'	=> '<DIV class="menu-layer">',
+		'LIST_END'		=> '</DIV>',
+		'ARTICLE_START'	=> '<DIV class="menu-item">',
+		'ARTICLE_END'	=> '</DIV>',
+		'DIR_START'		=> '<DIV class="dir-name>',
+		'DIR_END'		=> '</DIV>',
 	);
 	print $m->{HTML};
 
@@ -99,12 +97,9 @@ True or false to request that filename extensions, defined in the object's C<EXT
 
 A regular expression to be applied against directories/files to decide exclusion.
 
-=item TITLE_IN
+=item TITLE_FROM
 
-Should DirMenu access the document to collect a title to use in the menu?
-
-If so, set this to the name of the tag of which the first instance contains the text to use as a title.
-Could be better if we had XPath, but then using I<title> is normally enough, as it gets the text from the HTML's TITLE element.
+An HTML element within the doc, the first occurance of which will be accessed to get the text for the menu link. If it fails or is not supplied, will use the doc's filename.
 
 =item LIST_START, LIST_END
 
@@ -144,6 +139,7 @@ It is in this slot that a single scalar representing the composed HTML menu will
 =item OUTPUT
 
 Defaults to LIST, which produces HTML output using the options and defaults above.  Could be used to call another processing sub (in C<&new>) to output maybe a drop-down menu.
+
 =cut
 
 
@@ -159,7 +155,7 @@ sub new { my ($class) = (shift);
 	$self->{START} 				= cwd;
 	$self->{URL_ROOT} 			= 'http://localhost/';
 	$self->{URL_ROOT_TEXT}		= "Home";
-	$self->{EXTENSIONS}			= '.*\.html?$';
+	$self->{EXTENSIONS}			= '.*\.(html?|asp)$';
 	$self->{PRINTEXTENSIONS}	= 'false';
 	$self->{LIST_START}			= '<UL>';
 	$self->{LIST_END}			= '</UL>';
@@ -168,7 +164,7 @@ sub new { my ($class) = (shift);
 	$self->{DIR_START}			= '<BR><BIG>',
 	$self->{DIR_END}			= '</BIG>',
 	$self->{HTMLDEFAULT}		= '[No content]';
-	$self->{TITLE_IN}			= 'true';
+	$self->{TITLE_FROM}			= 'title';
 	$self->{TOPDIRTEXT}			= 'Home';
 
 	# Set/overwrite public slots with user's values
@@ -221,12 +217,14 @@ sub collect_this_dir { my ($self,$dir)= (shift,shift);
 	# Include the files in this directoyr in the menu?
 	if ($self->{MODE}=~/^(ALL|FILES)$/i){
 		foreach my $fn (@read_dir){
-			my $link_text;
+			my $link_text='';
+			my $p;
 			next if exists $self->{EXC_FILES} and $fn=~m/$self->{EXC_FILES}/sgi;
-			if (exists $self->{TITLE_IN} and my $p = HTML::TokeParser->new("$dir/$fn") ) {
-				if ($p->get_tag($self->{TITLE_IN}) ){ $link_text = $p->get_trimmed_text }
-				else { $link_text = $fn }
-			} else {   $link_text = $fn }
+			$link_text = $p->get_trimmed_text
+				if exists $self->{TITLE_FROM}
+				and $p = HTML::TokeParser->new("$dir/$fn")
+				and $p->get_tag(lc $self->{TITLE_FROM});
+			$link_text = $fn if $link_text eq '';
 			push @{$self->{DIRS}->{$dir_mod}}, {LINK => "$dir_mod/$fn", TEXT=>$link_text,};
 		}
 	}
@@ -268,7 +266,7 @@ sub create_html { my $self = shift;
 	if ($self->{DIRS} eq {}) {			# Create the menu if dirs were found
 		$self->{HTML} .= "\t$self->{ARTICLE_START}\n\t\t$self->{HTMLDEFAULT}\n\t$self->{ARTICLE_END}\n\n";
 	} else {
-		foreach my $dir (keys %{$self->{DIRS}} ){
+		foreach my $dir (sort keys %{$self->{DIRS}} ){
 			my $dir_mod = $self->dir2url($dir);
 			if (exists $self->{URL_ROOT}){
 				$dir_mod =~ s/^($self->{URL_ROOT})// if defined $self->{ARTICLE_ROOT};
@@ -319,7 +317,7 @@ sub create_html { my $self = shift;
 					$self->{HTML} .= "</A>\n";
 					$self->{HTML} .= "\t$self->{ARTICLE_END}\n";
 				}
-			} # Next dir
+			} # Next file in dir
 		}	# Next dir
 	} # End if
 	$self->{HTML} .= "\n<!-- LIST_END follows -->\n" . $self->{LIST_END} ."\n\n";
@@ -374,9 +372,22 @@ Does not list directories empty of files mathcing the search pattern.
 
 If called with C<RECURSE=>'false'>, directories will displayed as if they were files. This may change.
 
+=item *
+
+Whilst this has been fully tested on non-recursive functions, more time needs to be spent on RECURSE method before we get to version 1.0.
+
+=head1 TODO
+
+=item *
+
+Sort listings alphabetically.
+
 =head1 SEE ALSO
 
-HTML::EasyTemplate
+	HTML::TokeParser
+	HTML::EasyTemplate
+	HTML::EasyTemplate::PageMenu
+	HTML::EasyTemplate::BuildMySite
 
 =head1 AUTHOR
 
@@ -386,6 +397,5 @@ Lee Goddard (LGoddard@CPAN.org)
 
 Copyright 2000-2001 Lee Goddard.
 
-This library is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
