@@ -1,6 +1,5 @@
 Changes
 DirMenu.pm
-DirMenu.xs
 Makefile.PL
 MANIFEST
 test.pl
