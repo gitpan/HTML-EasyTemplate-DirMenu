@@ -1,13 +1,11 @@
 package HTML::EasyTemplate::DirMenu;
 use HTML::EasyTemplate;
+use HTML::TokeParser;
 use strict;
 use Cwd;
-use HTML::TokeParser;
 use warnings;
 
-our $VERSION = 0.5;	# 26/04/2001
-
-=pod
+our $VERSION = 0.6;		# 07/05/2001
 
 =head1 NAME
 
@@ -21,52 +19,35 @@ Provide an easy means of creating from a directory a representative block of HTM
 
 Print a simple menu of HTML files in current working directory:
 
-	use HTML::EasyTemplate::DirMenu;
+	use HTML::EasyTemplate;
 	my $m = new HTML::EasyTemplate::DirMenu (
-		'MODE'		=> 'ALL',
-		'RECURSE'	=> 'TRUE',
-		'START'		=> 'E:/www/emc2.vhn.net/live',
-		'URL_ROOT'	=> 'http://dev.localhost',
-		'EXTENSIONS'=> '\.html?',
-		'TITLE_IN'	=> 'title',
-		'LIST_START'	=> '<OL>',
-		'LIST_END'	=> '</OL>',
+		'START'			=> 'E:/www/leegoddard_com/FL',
+		'URL_ROOT'		=> 'http://localhost/leegoddard_com/FL',
+		'EXTENSIONS'	=> '.*',
+		'MODE'			=>	'all',
+		'RECURSE'		=> 'true',
+		'TITLE_IN'		=> 'true',
+		'LIST_START'	=> '<UL>',
+		'LIST_END'		=> '</UL>',
 		'ARTICLE_START'	=> '<LI>',
 		'ARTICLE_END'	=> '</LI>',
-		'DIR_START'	=> '<BIG>',
-		'DIR_END'	=> '</BIG>',
-		'EXC_DIRS'	=> '^(ignore_these_dirs|ignoreme2)$',
-		'EXC_FILES'	=> '^(private\.html?|_.*\.html)$',
+		'DIR_START'		=> '<BR><BIG>',
+		'DIR_END'		=> '</BIG>',
 	);
 	print $m->{HTML};
 
-Add the following lines to the above for a menu to an EasyTemplate, as C<TEMPLATEITEM name='menu1'>, based on the example provided in C<HTML::EasyTemplate>:
+Add the following lines to the above for a menu in an HTML::EasyTemplate, as C<TEMPLATEITEM name='menu1'> (based on the example provided in C<HTML::EasyTemplate>):
 
-	use HTML::EasyTemplate;
-	my $m = new HTML::EasyTemplate::DirMenu (
-		'START'		=> 'E:/www/emc2.vhn.net/live',
-		'URL_ROOT'	=> 'http://dev.localhost',
-		'EXTENSIONS'=> '.*',
-		'MODE'		=>	'all',
-		'RECURSE'	=> 'true',
-		'TITLE_IN'	=> 'true',
-		'LIST_START'	=> '<OL>',
-		'LIST_END'	=> '</OL>',
-		'ARTICLE_START'	=> '<LI>',
-		'ARTICLE_END'	=> '</LI>',
-		'DIR_START'	=> '<BIG>',
-		'DIR_END'	=> '</BIG>',
-	);
-
+	use HTML::EasyTemplate::DirMenu;
 	my %items = (
 		'articleTitle'=> 'An Example Article',
 		'articleText' => 'This is boring sample text: hello world...',
-		'menu1'		  => $m->{HTML},
+		'menu'		  => $m->{HTML},
 	);
-	my $TEMPLATE = new EasyTemplate('test_template.html');
+	my $TEMPLATE = new HTML::EasyTemplate('E:/WWW/leegoddard_com/FL/_templates/Template_Blank.html') or die "Couldn't make template!";
 	$TEMPLATE->title("Latka Lover");
 	$TEMPLATE -> process('fill',\%items);
-	$TEMPLATE -> save( '.','new.html');
+	$TEMPLATE -> save( 'E:/WWW/leegoddard_com/FL/','new2.html');
 	print "Saved the new document as <$TEMPLATE->{ARTICLE_PATH}>\n";
 	__END__
 
@@ -104,11 +85,15 @@ The directory to menu, or at which to start menuing.
 
 =item EXTENSIONS
 
-Filter - a regular expression fragment applied to the filenames within a directory.  The regular expression fragment is insensitive to case, is bracketed, and matches after a dot and before the end:
+Filter - a regular expression fragment applied to the filenames within a directory: insensitive to case, is bracketed, and matches after a dot, and is tied to the the end of the string:
 
 	m/\.($HERE)$/i
 
-Deafults to C<.*\.html?$>.
+Deafults to C<.*\.html?>.
+
+=item PRINTEXTENSIONS
+
+True or false to request that filename extensions, defined in the object's C<EXTENSIONS> slot above, be included or excluded in the printing of a filename.  Defaults to exclude.
 
 =item EXC_DIRS, EXC_FILES
 
@@ -120,10 +105,6 @@ Should DirMenu access the document to collect a title to use in the menu?
 
 If so, set this to the name of the tag of which the first instance contains the text to use as a title.
 Could be better if we had XPath, but then using I<title> is normally enough, as it gets the text from the HTML's TITLE element.
-
-=item PRINTEXTENSIONS
-
-Request that filename extensions, defined in the object's C<EXTENSIONS> slot above, be included in the printing of a filename.
 
 =item LIST_START, LIST_END
 
@@ -139,7 +120,7 @@ HTML to use when no files are found in a directory. Defaults to C<[No content]>.
 
 =item TOPDIRTEXT
 
-Text used as top-level directory title
+Text I<will be> used as top-level directory title.
 
 =item ARTICLE_ROOT
 
@@ -175,19 +156,20 @@ sub new { my ($class) = (shift);
 	elsif (not ref $_[0]){		%args = @_ }
 
 	# Set default values for public slots
-	$self->{START} = cwd;
-	$self->{URL_ROOT} = 'http://localhost/';
-	$self->{URL_ROOT_TEXT} = "Home";
-	$self->{EXTENSIONS}	= '.*\.html?$';
-	$self->{LIST_START}	= '';
-	$self->{LIST_END}	= '';
-	$self->{ARTICLE_START}	= '';
-	$self->{ARTICLE_END}	= '';
-	$self->{DIR_START}	= '<BIG>',
-	$self->{DIR_END}	= '</BIG>',
-	$self->{HTMLDEFAULT}= '[No content]';
-	$self->{TITLE_IN}	= 'title';
-	$self->{TOPDIRTEXT}	= 'Home';
+	$self->{START} 				= cwd;
+	$self->{URL_ROOT} 			= 'http://localhost/';
+	$self->{URL_ROOT_TEXT}		= "Home";
+	$self->{EXTENSIONS}			= '.*\.html?$';
+	$self->{PRINTEXTENSIONS}	= 'false';
+	$self->{LIST_START}			= '<UL>';
+	$self->{LIST_END}			= '</UL>';
+	$self->{ARTICLE_START}		= '<LI>';
+	$self->{ARTICLE_END}		= '</LI>';
+	$self->{DIR_START}			= '<BR><BIG>',
+	$self->{DIR_END}			= '</BIG>',
+	$self->{HTMLDEFAULT}		= '[No content]';
+	$self->{TITLE_IN}			= 'true';
+	$self->{TOPDIRTEXT}			= 'Home';
 
 	# Set/overwrite public slots with user's values
 	foreach (keys %args) {	$self->{uc $_} = $args{$_} }
@@ -236,13 +218,6 @@ sub collect_this_dir { my ($self,$dir)= (shift,shift);
 	my @read_dir = (grep {!-d and /($self->{EXTENSIONS})$/i} sort readdir DIR);
 	closedir DIR;
 
-###### Store a refernce to this dir
-#	push @{$self->{DIRS}->{$dir_mod}},
-#		{LINK  => $self->dir2url($dir),
-#		 TEXT  => $self->dir2txt($dir_mod.'/'.$dir),
-#		 ISDIR => 1,
-#	};
-
 	# Include the files in this directoyr in the menu?
 	if ($self->{MODE}=~/^(ALL|FILES)$/i){
 		foreach my $fn (@read_dir){
@@ -256,17 +231,11 @@ sub collect_this_dir { my ($self,$dir)= (shift,shift);
 		}
 	}
 
-	# Include a mention of THIS DIR in the menu?
-	if ($self->{MODE}=~/^(ALL|DIRS)$/i and $#read_dir>-1){
-		# For link text, extract the last word in the modified directory path
-		push @{$self->{DIRS}->{$dir_mod}}, {LINK => $dir_mod, TEXT => $self->dir2txt($dir_mod), ISDIR => 1,};
-	}
-
 	# Include sub-dirs in the menu?
 	if ($self->{MODE}=~/^(ALL|DIRS)$/i and $#read_dir>-1){
 		opendir DIR, $dir;
 		foreach my $dn (grep {-d and !/^\.{1,2}$/} readdir DIR){
-			next if $dn=~m/$self->{EXC_DIRS}/sgi;
+			next if exists $self->{EXC_DIRS} and $dn=~m/$self->{EXC_DIRS}/sgi;
 			if (exists $self->{RECURSE} and $self->{RECURSE} =~ m/^(true|yes)$/i){
 				$self->collect_this_dir( $dir.'/'.$dn );
 			} else {
@@ -294,6 +263,7 @@ Incidentaly returns that HTML.
 =cut
 
 sub create_html { my $self = shift;
+#use Data::Dumper;print Dumper($self);exit;
 	$self->{HTML} = "\n<!-- LIST_START follows -->\n" . $self->{LIST_START} . "\n\n";
 	if ($self->{DIRS} eq {}) {			# Create the menu if dirs were found
 		$self->{HTML} .= "\t$self->{ARTICLE_START}\n\t\t$self->{HTMLDEFAULT}\n\t$self->{ARTICLE_END}\n\n";
@@ -307,22 +277,27 @@ sub create_html { my $self = shift;
 			}
 			$dir_mod = '/' if $dir_mod eq '';
 
-			# Build link to dir
-#foreach my $hr (@{$self->{DIRS}->{$dir}} ){
-#	foreach (keys %{$hr}){
-#		warn $_,"...",%{$hr}->{$_};
-#	}
-#	warn "________";
-#};#->{ISDIR};
-#warn "***";
+			# Build link to this dir
+			if ($self->{MODE}=~/^(ALL|DIRS)$/i){
+				$self->{HTML} .= "\n<!-- Dir $dir -->\n";
+				$self->{HTML} .= "\t$self->{DIR_START}" if exists $self->{DIR_START};
+				my ($root, $seg);
+				foreach (split '/',$dir_mod){
+					$root .= $_.'/';
+					next if $_ eq '' or $self->{URL_ROOT} =~ m/^$root/;
+					$seg .= " <A href='$root'>$_</A>";
+				}
+				$self->{HTML} .= "\t$seg\t";
+				$self->{HTML} .= "\t$self->{DIR_END}\n" if exists $self->{DIR_END};;
+			}
 
 			# Build links to files
 			foreach (@{$self->{DIRS}->{$dir}}){
 				if ($self->{MODE}=~/^(ALL|DIRS)$/i and exists $self->{$dir}->{ISDIR}){
+					next;
 					$self->{HTML} .= "\n<!-- Dir $dir -->\n";
 					$self->{HTML} .= "\t$self->{DIR_START}" if exists $self->{DIR_START};
 					my ($root, $seg);
-					if ($root=$self->{URL_ROOT}){$root=$main::URL_ROOT}
 					foreach (split '/',$dir_mod){
 						next if $_ eq '';
 						$root .= '/'.$_;
@@ -335,12 +310,10 @@ sub create_html { my $self = shift;
 				else {
 					$self->{HTML} .= "\t$self->{ARTICLE_START}\n";
 					$self->{HTML} .= "\t\t<A href='$_->{LINK}'>";
-					if (exists $self->{PRINTEXTENSIONS} and $self->{PRINTEXTENSIONS} =~ m/^(false|no)$/i) {
-						$self->{HTML} .= $_->{TEXT};
-					} elsif (m/\.($self->{EXTENSIONS})$/) {
-						s/\.($self->{EXTENSIONS})$//gi;
+					if (exists $self->{PRINTEXTENSIONS} and $self->{PRINTEXTENSIONS} !~ m/^(false|no)$/i) {
 						$self->{HTML} .= $_->{TEXT};
 					} else {
+						$_->{TEXT} =~ s/\.($self->{EXTENSIONS})$//gi;
 						$self->{HTML} .= $_->{TEXT};
 					}
 					$self->{HTML} .= "</A>\n";
@@ -354,8 +327,9 @@ sub create_html { my $self = shift;
 }
 
 
-
+#
 # Take dir path and return url
+#
 sub dir2url { my ($self,$dir_mod) = (shift,shift);
 	if (exists $self->{ARTICLE_ROOT}){
 		$dir_mod =~ s/^($self->{ARTICLE_ROOT})// if defined $self->{ARTICLE_ROOT};
@@ -371,7 +345,10 @@ sub dir2url { my ($self,$dir_mod) = (shift,shift);
 	}
 }
 
-# Take dir path and return last dir
+
+#
+# Take dir path and return last dir in path
+#
 sub dir2txt { my ($self,$dirpath) = (shift,shift);
 	if ($dirpath eq $self->{URL_ROOT}) {
 		$dirpath = $self->{URL_ROOT_TEXT};
@@ -389,7 +366,13 @@ sub dir2txt { my ($self,$dirpath) = (shift,shift);
 
 =head1 CAVEATS
 
+=item *
+
 Does not list directories empty of files mathcing the search pattern.
+
+=item *
+
+If called with C<RECURSE=>'false'>, directories will displayed as if they were files. This may change.
 
 =head1 SEE ALSO
 
